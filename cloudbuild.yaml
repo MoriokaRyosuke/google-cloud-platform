@@ -1,0 +1,56 @@
+# Cloud Build 設定ファイル（個人テスト環境）
+steps:
+  # 1. 依存関係のインストール
+  - name: "node:18"
+    entrypoint: "npm"
+    args: ["ci"]
+
+  # 2. Next.js プロジェクトのビルド
+  - name: "node:18"
+    entrypoint: "npm"
+    args: ["run", "build"]
+
+  # 3. Docker イメージをビルド
+  - name: "gcr.io/cloud-builders/docker"
+    args:
+      [
+        "build",
+        "-t",
+        "gcr.io/my-project-test-470901/github.com/MoriokaRyosuke/google-cloud-platform:$COMMIT_SHA",
+        "-t",
+        "gcr.io/my-project-test-470901/github.com/MoriokaRyosuke/google-cloud-platform:latest",
+        ".",
+      ]
+
+  # 4. Docker イメージを Container Registry にプッシュ
+  - name: "gcr.io/cloud-builders/docker"
+    args: ["push", "gcr.io/my-project-test-470901/github.com/MoriokaRyosuke/google-cloud-platform:$COMMIT_SHA"]
+
+  - name: "gcr.io/cloud-builders/docker"
+    args: ["push", "gcr.io/my-project-test-470901/github.com/MoriokaRyosuke/google-cloud-platform:latest"]
+
+  # 5. Cloud Run にデプロイ
+  - name: "gcr.io/cloud-builders/gcloud"
+    args:
+      [
+        "run",
+        "deploy",
+        "billboard-test",
+        "--image",
+        "gcr.io/my-project-test-470901/github.com/MoriokaRyosuke/google-cloud-platform:$COMMIT_SHA",
+        "--region",
+        "asia-northeast1",
+        "--platform",
+        "managed",
+        "--allow-unauthenticated",
+        "--port",
+        "3000",
+      ]
+
+# ビルドオプション
+options:
+  machineType: "E2_HIGHCPU_4"
+  logging: CLOUD_LOGGING_ONLY
+
+# タイムアウト設定（15分）
+timeout: 900s
