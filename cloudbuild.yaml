@@ -46,7 +46,7 @@ steps:
       [
         "run",
         "deploy",
-        "google-cloud-platform",
+        "nextjs-app",
         "--image",
         "gcr.io/my-project-test-470901/google-cloud-platform:$COMMIT_SHA",
         "--region",
