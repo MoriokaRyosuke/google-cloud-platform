@@ -49,7 +49,6 @@ steps:
 
 # ビルドオプション
 options:
-  machineType: "E2_HIGHCPU_4"
   logging: CLOUD_LOGGING_ONLY
 
 # タイムアウト設定（15分）
