@@ -15,11 +15,17 @@ steps:
     entrypoint: "bash"
     args: ["-c", "npm install -g pnpm && pnpm build"]
 
-  # 4. Docker イメージをビルド
+  # 4. Dockerfileの存在確認とビルド準備
+  - name: "gcr.io/cloud-builders/docker"
+    entrypoint: "bash"
+    args: ["-c", 'ls -la && echo "=== Dockerfile content ===" && cat Dockerfile || echo "Dockerfile not found"']
+
+  # 5. Docker イメージをビルド
   - name: "gcr.io/cloud-builders/docker"
     args:
       [
         "build",
+        "--no-cache",
         "-t",
         "gcr.io/my-project-test-470901/google-cloud-platform:$COMMIT_SHA",
         "-t",
@@ -27,12 +33,34 @@ steps:
         ".",
       ]
 
-  # 5. Docker イメージをプッシュ
+  # 6. Docker イメージをプッシュ
   - name: "gcr.io/cloud-builders/docker"
     args: ["push", "gcr.io/my-project-test-470901/google-cloud-platform:$COMMIT_SHA"]
 
   - name: "gcr.io/cloud-builders/docker"
     args: ["push", "gcr.io/my-project-test-470901/google-cloud-platform:latest"]
+
+  # 7. Cloud Run にデプロイ
+  - name: "gcr.io/cloud-builders/gcloud"
+    args:
+      [
+        "run",
+        "deploy",
+        "google-cloud-platform",
+        "--image",
+        "gcr.io/my-project-test-470901/google-cloud-platform:$COMMIT_SHA",
+        "--region",
+        "asia-northeast1",
+        "--platform",
+        "managed",
+        "--allow-unauthenticated",
+        "--port",
+        "3000",
+        "--memory",
+        "1Gi",
+        "--max-instances",
+        "10",
+      ]
 
   # 6. Cloud Run にデプロイ
   - name: "gcr.io/cloud-builders/gcloud"
