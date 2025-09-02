@@ -1,92 +1,97 @@
 # Next.js プロジェクト用 Cloud Build 設定ファイル（Cloud Run デプロイ）
 steps:
-  # 1. pnpmのインストール
+  # 1. pnpmのインストールと依存関係のインストール
   - name: "node:20"
     entrypoint: "bash"
-    args: ["-c", "npm install -g pnpm && pnpm --version"]
+    args:
+      - "-c"
+      - |
+        echo "=== Installing pnpm ==="
+        npm install -g pnpm
+        pnpm --version
+        echo "=== Installing dependencies ==="
+        pnpm install --frozen-lockfile
 
-  # 2. 依存関係のインストール
+  # 2. Next.js プロジェクトのビルド
   - name: "node:20"
     entrypoint: "bash"
-    args: ["-c", "npm install -g pnpm && pnpm install --frozen-lockfile"]
+    args:
+      - "-c"
+      - |
+        npm install -g pnpm
+        echo "=== Building Next.js application ==="
+        pnpm build
+        echo "=== Build completed ==="
 
-  # 3. Next.js プロジェクトのビルド
-  - name: "node:20"
-    entrypoint: "bash"
-    args: ["-c", "npm install -g pnpm && pnpm build"]
-
-  # 4. Dockerfileの存在確認とビルド準備
+  # 3. Dockerfileの存在確認
   - name: "gcr.io/cloud-builders/docker"
     entrypoint: "bash"
-    args: ["-c", 'ls -la && echo "=== Dockerfile content ===" && cat Dockerfile || echo "Dockerfile not found"']
+    args:
+      - "-c"
+      - |
+        echo "=== Checking project structure ==="
+        ls -la
+        echo "=== Dockerfile content ==="
+        if [ -f "Dockerfile" ]; then
+          cat Dockerfile
+        else
+          echo "ERROR: Dockerfile not found"
+          exit 1
+        fi
 
-  # 5. Docker イメージをビルド
+  # 4. Docker イメージをビルド
   - name: "gcr.io/cloud-builders/docker"
     args:
-      [
-        "build",
-        "--no-cache",
-        "-t",
-        "gcr.io/my-project-test-470901/google-cloud-platform:$COMMIT_SHA",
-        "-t",
-        "gcr.io/my-project-test-470901/google-cloud-platform:latest",
-        ".",
-      ]
+      - "build"
+      - "--no-cache"
+      - "-t"
+      - "gcr.io/$PROJECT_ID/billboard:$COMMIT_SHA"
+      - "-t"
+      - "gcr.io/$PROJECT_ID/billboard:latest"
+      - "."
 
-  # 6. Docker イメージをプッシュ
+  # 5. Docker イメージをContainer Registryにプッシュ
   - name: "gcr.io/cloud-builders/docker"
-    args: ["push", "gcr.io/my-project-test-470901/google-cloud-platform:$COMMIT_SHA"]
-
-  - name: "gcr.io/cloud-builders/docker"
-    args: ["push", "gcr.io/my-project-test-470901/google-cloud-platform:latest"]
-
-  # 7. Cloud Run にデプロイ
-  - name: "gcr.io/cloud-builders/gcloud"
     args:
-      [
-        "run",
-        "deploy",
-        "google-cloud-platform",
-        "--image",
-        "gcr.io/my-project-test-470901/google-cloud-platform:$COMMIT_SHA",
-        "--region",
-        "asia-northeast1",
-        "--platform",
-        "managed",
-        "--allow-unauthenticated",
-        "--port",
-        "3000",
-        "--memory",
-        "1Gi",
-        "--max-instances",
-        "10",
-      ]
+      - "push"
+      - "gcr.io/$PROJECT_ID/billboard:$COMMIT_SHA"
+
+  - name: "gcr.io/cloud-builders/docker"
+    args:
+      - "push"
+      - "gcr.io/$PROJECT_ID/billboard:latest"
 
   # 6. Cloud Run にデプロイ
   - name: "gcr.io/cloud-builders/gcloud"
     args:
-      [
-        "run",
-        "deploy",
-        "google-cloud-platform",
-        "--image",
-        "gcr.io/my-project-test-470901/google-cloud-platform:$COMMIT_SHA",
-        "--region",
-        "asia-northeast1",
-        "--platform",
-        "managed",
-        "--allow-unauthenticated",
-        "--port",
-        "3000",
-        "--memory",
-        "1Gi",
-        "--max-instances",
-        "10",
-      ]
+      - "run"
+      - "deploy"
+      - "billboard-app"
+      - "--image"
+      - "gcr.io/$PROJECT_ID/billboard:$COMMIT_SHA"
+      - "--region"
+      - "asia-northeast1"
+      - "--platform"
+      - "managed"
+      - "--allow-unauthenticated"
+      - "--port"
+      - "3000" # Next.jsの標準ポート
+      - "--memory"
+      - "1Gi"
+      - "--cpu"
+      - "1"
+      - "--max-instances"
+      - "10"
+      - "--min-instances"
+      - "0"
+      - "--timeout"
+      - "300"
+      - "--set-env-vars"
+      - "NODE_ENV=production"
 
 # ビルドオプション
 options:
   logging: CLOUD_LOGGING_ONLY
 
-# タイムアウト設定（15分）
-timeout: 900s
+# タイムアウト設定（20分）
+timeout: 1200s
